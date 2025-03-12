@@ -1,268 +1,358 @@
-from flask import Flask, render_template, session, redirect, url_for
-import os
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 import sqlite3
 from datetime import datetime
+import os
+import logging
 
-# Set environment variables for OpenSSL 3.x compatibility
-os.environ['OPENSSL_CONF'] = '/dev/null'
-os.environ['OPENSSL_LEGACY_PROVIDER'] = '1'
+# Configure logging
+logging.basicConfig(level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        logging.FileHandler('blacktwitter.log'),
+                        logging.StreamHandler()
+                    ])
+logger = logging.getLogger(__name__)
 
 # Create Flask application
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 app.secret_key = os.urandom(24)
-app.config['DEBUG'] = True
+app.config['DATABASE'] = 'blacktwitter.db'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload
+app.config['PREFERRED_URL_SCHEME'] = 'http'
 
-# Database configuration
-DATABASE = 'blacktwitter.db'
+# Custom error handler for bad requests
+@app.errorhandler(400)
+def bad_request(e):
+    logger.warning(f"Bad request: {request.remote_addr} - {request.method} {request.url}")
+    return render_template('error.html', 
+                           error_code=400, 
+                           error_message="Bad Request. Please check your request."), 400
+
+# Custom error handler for SSL/TLS connection attempts
+@app.before_request
+def handle_ssl_connection():
+    # Log and handle potential SSL connection attempts
+    if request.environ.get('wsgi.url_scheme') != 'http':
+        logger.info(f"SSL/TLS connection attempt from {request.remote_addr}")
+        # You might want to redirect to HTTPS if you have SSL configured
+        # return redirect(request.url.replace('http://', 'https://'), code=301)
 
 # Database helper functions
 def get_db():
     """Get database connection with row factory"""
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(app.config['DATABASE'])
     conn.row_factory = sqlite3.Row
     return conn
 
 def query_db(query, args=(), one=False):
     """Execute query and fetch results"""
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(query, args)
-    rv = cur.fetchall()
-    conn.commit()
-    conn.close()
-    return (rv[0] if rv else None) if one else rv
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(query, args)
+        rv = cur.fetchall()
+        conn.commit()
+        return (rv[0] if rv else None) if one else rv
+    except sqlite3.Error as e:
+        logger.error(f"Database error: {e}")
+        raise
+    finally:
+        conn.close()
 
 # Initialize database
 def init_db():
     """Initialize the database with tables and the admin user"""
-    from werkzeug.security import generate_password_hash
-    
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    # Create users table
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        joined_date TIMESTAMP NOT NULL,
-        is_admin BOOLEAN NOT NULL DEFAULT 0
-    )
-    ''')
-    
-    # Create posts table
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS posts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        content TEXT NOT NULL,
-        post_date TIMESTAMP NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    )
-    ''')
-    
-    # Create comments table
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS comments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        post_id INTEGER NOT NULL,
-        user_id INTEGER NOT NULL,
-        content TEXT NOT NULL,
-        comment_date TIMESTAMP NOT NULL,
-        FOREIGN KEY (post_id) REFERENCES posts (id),
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    )
-    ''')
-    
-    # Check if admin user exists
-    c.execute("SELECT * FROM users WHERE username = 'admin'")
-    admin_exists = c.fetchone()
-    
-    # Create admin user if not exists
-    if not admin_exists:
-        hashed_password = generate_password_hash('btadmin', method='sha256')
-        c.execute("INSERT INTO users (username, password, joined_date, is_admin) VALUES (?, ?, ?, ?)",
-                 ('admin', hashed_password, datetime.now(), 1))
-    
-    conn.commit()
-    conn.close()
-    print("Database initialized successfully!")
-
-# Import blueprints
-try:
-    from routes.auth import auth_bp
-    from routes.post import post_bp
-    from routes.comment import comment_bp
-    from routes.profile import profile_bp
-    from routes.admin import admin_bp
-    from routes.main import main_bp
-    
-    # Register blueprints
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(post_bp)
-    app.register_blueprint(comment_bp)
-    app.register_blueprint(profile_bp)
-    app.register_blueprint(admin_bp)
-    app.register_blueprint(main_bp)
-    
-    USING_BLUEPRINTS = True
-except ImportError:
-    print("Could not import blueprints, using inline routes")
-    USING_BLUEPRINTS = False
-
-# Initialize the database
-init_db()
-
-# If not using blueprints, define routes directly in this file
-if not USING_BLUEPRINTS:
-    from flask import request, flash
-    from werkzeug.security import generate_password_hash, check_password_hash
-    
-    @app.route('/')
-    def index():
-        """Main page with post timeline"""
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
+    try:
+        conn = sqlite3.connect(app.config['DATABASE'])
+        c = conn.cursor()
         
-        posts = query_db('''
-        SELECT p.id, p.content, p.post_date, u.username
-        FROM posts p
-        JOIN users u ON p.user_id = u.id
-        ORDER BY p.post_date DESC
+        # Create users table
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            joined_date TIMESTAMP NOT NULL,
+            is_admin BOOLEAN NOT NULL DEFAULT 0
+        )
         ''')
         
-        return render_template('blacktwitter.html', posts=posts)
+        # Create posts table
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            post_date TIMESTAMP NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        ''')
+        
+        # Create comments table
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            comment_date TIMESTAMP NOT NULL,
+            FOREIGN KEY (post_id) REFERENCES posts (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        ''')
+        
+        # Check if admin user exists
+        c.execute("SELECT * FROM users WHERE username = 'admin'")
+        admin_exists = c.fetchone()
+        
+        # Create admin user if not exists
+        if not admin_exists:
+            hashed_password = generate_password_hash('btadmin', method='sha256')
+            c.execute("INSERT INTO users (username, password, joined_date, is_admin) VALUES (?, ?, ?, ?)",
+                     ('admin', hashed_password, datetime.now(), 1))
+        
+        conn.commit()
+        logger.info("Database initialized successfully")
+    except sqlite3.Error as e:
+        logger.error(f"Database initialization error: {e}")
+    finally:
+        conn.close()
 
-    @app.route('/login', methods=['GET', 'POST'])
-    def login():
-        """Handle user login"""
-        if request.method == 'POST':
-            username = request.form['username']
-            password = request.form['password']
+# Ensure the templates directory exists
+def ensure_templates():
+    if not os.path.exists('templates'):
+        os.makedirs('templates')
+    
+    # Templates dictionary
+    templates = {
+        'index.html': '''
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>BlackTwitter</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    max-width: 600px; 
+                    margin: 0 auto; 
+                    padding: 20px; 
+                    line-height: 1.6;
+                }
+                .navbar { 
+                    display: flex; 
+                    justify-content: space-between; 
+                    margin-bottom: 20px; 
+                    padding: 10px; 
+                    background-color: #f4f4f4;
+                }
+                .flash-messages { 
+                    background-color: #f0f0f0; 
+                    padding: 10px; 
+                    margin-bottom: 15px; 
+                }
+            </style>
+        </head>
+        <body>
+            <div class="navbar">
+                <h1>BlackTwitter</h1>
+                {% if session.username %}
+                    <div>
+                        Welcome, {{ session.username }} | 
+                        <a href="{{ url_for('logout') }}">Logout</a>
+                    </div>
+                {% else %}
+                    <a href="{{ url_for('login') }}">Login</a>
+                {% endif %}
+            </div>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for message in messages %}
+                            <p>{{ message }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <h2>Welcome to BlackTwitter</h2>
+            {% if session.username %}
+                <p>You are logged in!</p>
+                {% if session.is_admin %}
+                    <p>You have admin privileges.</p>
+                {% endif %}
+            {% else %}
+                <p>Please <a href="{{ url_for('login') }}">login</a> to continue.</p>
+            {% endif %}
+        </body>
+        </html>
+        ''',
+        'login.html': '''
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Login - BlackTwitter</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    max-width: 300px; 
+                    margin: 0 auto; 
+                    padding: 20px; 
+                    display: flex; 
+                    flex-direction: column; 
+                    align-items: center;
+                }
+                form { 
+                    width: 100%; 
+                    display: flex; 
+                    flex-direction: column; 
+                }
+                input, button { 
+                    margin: 10px 0; 
+                    padding: 10px; 
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                }
+                button {
+                    background-color: #007bff;
+                    color: white;
+                    border: none;
+                    cursor: pointer;
+                }
+                .flash-messages {
+                    color: red;
+                    margin-bottom: 15px;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Login to BlackTwitter</h1>
             
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for message in messages %}
+                            <p>{{ message }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+            <form method="POST">
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit">Login</button>
+            </form>
+            <p><small>Default admin credentials: username: admin, password: btadmin</small></p>
+        </body>
+        </html>
+        ''',
+        'error.html': '''
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Error - BlackTwitter</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    max-width: 600px; 
+                    margin: 0 auto; 
+                    padding: 20px; 
+                    text-align: center;
+                }
+                .error-container {
+                    background-color: #f8d7da;
+                    color: #721c24;
+                    padding: 20px;
+                    border-radius: 5px;
+                    margin-top: 50px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="error-container">
+                <h1>Error {{ error_code }}</h1>
+                <p>{{ error_message }}</p>
+                <a href="{{ url_for('index') }}">Return to Home</a>
+            </div>
+        </body>
+        </html>
+        '''
+    }
+    
+    for name, content in templates.items():
+        path = os.path.join('templates', name)
+        if not os.path.exists(path):
+            try:
+                with open(path, 'w') as f:
+                    f.write(content)
+                logger.info(f"Created template: {name}")
+            except IOError as e:
+                logger.error(f"Error creating template {name}: {e}")
+
+# Routes
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        try:
+            # Query the user
             user = query_db('SELECT * FROM users WHERE username = ?', [username], one=True)
             
             if user and check_password_hash(user['password'], password):
                 session['user_id'] = user['id']
                 session['username'] = user['username']
                 session['is_admin'] = user['is_admin']
+                
+                logger.info(f"Successful login for user: {username}")
                 flash('Login successful')
                 return redirect(url_for('index'))
             else:
+                logger.warning(f"Failed login attempt for user: {username}")
                 flash('Invalid username or password')
-        
-        return render_template('login.html')
+        except Exception as e:
+            logger.error(f"Login error: {e}")
+            flash('An error occurred during login')
+    
+    return render_template('login.html')
 
-    @app.route('/logout')
-    def logout():
-        """Handle user logout"""
-        session.clear()
-        flash('You have been logged out')
-        return redirect(url_for('login'))
+@app.route('/logout')
+def logout():
+    username = session.get('username', 'unknown')
+    session.clear()
+    logger.info(f"User logged out: {username}")
+    flash('You have been logged out')
+    return redirect(url_for('login'))
 
-    @app.route('/register', methods=['GET', 'POST'])
-    def register():
-        """Handle user registration"""
-        if request.method == 'POST':
-            username = request.form['username']
-            password = request.form['password']
-            
-            # Check if username exists
-            user_exists = query_db('SELECT * FROM users WHERE username = ?', [username], one=True)
-            
-            if user_exists:
-                flash('Username already exists')
-            else:
-                hashed_password = generate_password_hash(password, method='sha256')
-                query_db('INSERT INTO users (username, password, joined_date, is_admin) VALUES (?, ?, ?, ?)',
-                        [username, hashed_password, datetime.now(), 0])
-                flash('Registration successful, please login')
-                return redirect(url_for('login'))
-        
-        return render_template('register.html')
+# Ensure templates and database are set up
+init_db()
+ensure_templates()
 
-    @app.route('/post', methods=['POST'])
-    def create_post_route():
-        """Create a new post"""
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
-        
-        content = request.form['content']
-        
-        if content:
-            query_db('INSERT INTO posts (user_id, content, post_date) VALUES (?, ?, ?)',
-                    [session['user_id'], content, datetime.now()])
-            flash('Post created successfully')
-        
-        return redirect(url_for('index'))
-
-    @app.route('/post/<int:post_id>')
-    def view_post(post_id):
-        """View a single post with comments"""
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
-        
-        post = query_db('''
-        SELECT p.id, p.content, p.post_date, u.username
-        FROM posts p
-        JOIN users u ON p.user_id = u.id
-        WHERE p.id = ?
-        ''', [post_id], one=True)
-        
-        comments = query_db('''
-        SELECT c.id, c.content, c.comment_date, u.username
-        FROM comments c
-        JOIN users u ON c.user_id = u.id
-        WHERE c.post_id = ?
-        ORDER BY c.comment_date
-        ''', [post_id])
-        
-        return render_template('post.html', post=post, comments=comments)
-
-    @app.route('/comment/<int:post_id>', methods=['POST'])
-    def create_comment_route(post_id):
-        """Create a new comment on a post"""
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
-        
-        content = request.form['content']
-        
-        if content:
-            query_db('INSERT INTO comments (post_id, user_id, content, comment_date) VALUES (?, ?, ?, ?)',
-                    [post_id, session['user_id'], content, datetime.now()])
-            flash('Comment added successfully')
-        
-        return redirect(url_for('view_post', post_id=post_id))
-
-    @app.route('/profile')
-    def profile():
-        """View user profile"""
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
-        
-        user = query_db('SELECT * FROM users WHERE id = ?', [session['user_id']], one=True)
-        
-        posts = query_db('''
-        SELECT p.id, p.content, p.post_date
-        FROM posts p
-        WHERE p.user_id = ?
-        ORDER BY p.post_date DESC
-        ''', [session['user_id']])
-        
-        return render_template('profile.html', user=user, posts=posts)
-
-    @app.route('/admin')
-    def admin_panel():
-        """Admin panel for user management"""
-        if 'user_id' not in session or not session.get('is_admin'):
-            flash('Unauthorized access')
-            return redirect(url_for('index'))
-        
-        users = query_db('SELECT * FROM users ORDER BY joined_date DESC')
-        
-        return render_template('admin.html', users=users)
-
-# Update run.py file to properly import the app
+# For development
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8000)
+    # Improved logging for startup
+    logger.info("Starting BlackTwitter application")
+    
+    try:
+        # Allow both localhost and all network interfaces
+        app.run(
+            debug=True, 
+            host='0.0.0.0', 
+            port=8000, 
+            threaded=True
+        )
+    except Exception as e:
+        logger.critical(f"Application startup failed: {e}")
+        raise

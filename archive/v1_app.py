@@ -1,15 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 import datetime
 
-# Initialize Flask app
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///twitter_clone.db'
-app.config['SECRET_KEY'] = 'your_secret_key'  # Change this to a secure secret key
-
-# Initialize database, bcrypt, and login manager
+app.config['SECRET_KEY'] = 'your_secret_key'
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager()
@@ -86,31 +83,6 @@ def post_tweet():
     flash("Tweet posted!", "success")
     return redirect(url_for("home"))
 
-
-# Initialize all modules
-def init_modules():
-    # Import all feature modules
-    from user_profiles import init_user_profiles
-    from follow_system import init_follow_system
-    from tweet_interactions import init_tweet_interactions
-    from search_functionality import init_search_functionality
-    from api_endpoints import init_api
-    from media_support import init_media_support
-    from notifications import init_notifications
-    from security_enhancements import init_security
-    
-    # Initialize each module
-    init_user_profiles(app, User)
-    init_follow_system(app, User)
-    init_tweet_interactions(app, db, User, Tweet)
-    init_search_functionality(app, db, Tweet, User)
-    init_api(app, db, User, Tweet)
-    init_media_support(app, db, Tweet)
-    init_notifications(app, db, User, Tweet)
-    init_security(app, db, User, bcrypt)
-
-
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()  # Ensures database tables are created inside the application context
+    db.create_all()
     app.run(debug=True)

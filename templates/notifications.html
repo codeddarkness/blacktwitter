@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Notifications</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="container">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('home') }}">Twitter Clone</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('home') }}">Home</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <h1 class="mt-4">Notifications</h1>
+    
+    <div class="list-group">
+        {% for notification in notifications.items %}
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1">
+                        <a href="{{ url_for('user_profiles.profile', username=notification.sender.username) }}">{{ notification.sender.username }}</a>
+                        {% if notification.type == 'like' %}
+                            liked your tweet
+                        {% elif notification.type == 'follow' %}
+                            followed you
+                        {% elif notification.type == 'reply' %}
+                            replied to your tweet
+                        {% elif notification.type == 'retweet' %}
+                            retweeted your tweet
+                        {% elif notification.type == 'mention' %}
+                            mentioned you in a tweet
+                        {% endif %}
+                    </h5>
+                    <small>{{ notification.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                </div>
+                {% if notification.tweet %}
+                    <p class="mb-1">
+                        <a href="{{ url_for('tweet_interactions.view_tweet', tweet_id=notification.tweet.id) }}">
+                            {{ notification.tweet.content[:100] }}{% if notification.tweet.content|length > 100 %}...{% endif %}
+                        </a>
+                    </p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

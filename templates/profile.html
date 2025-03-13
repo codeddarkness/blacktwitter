@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Profile</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body class="container">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('home') }}">Twitter Clone</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('home') }}">Home</a>
+                    </li>
+                </ul>
+                <div class="navbar-nav">
+                    {% if current_user.is_authenticated %}
+                        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                    {% else %}
+                        <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+                        <a class="nav-link" href="{{ url_for('register') }}">Register</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <img src="{{ url_for('static', filename='profile_pics/' + user.profile_picture) }}" class="rounded-circle img-fluid mb-3" style="max-width: 150px;">
+                    <h3>{{ user.username }}</h3>
+                    {% if user.bio %}
+                        <p>{{ user.bio }}</p>
+                    {% endif %}
+                    
+                    {% if current_user.is_authenticated and current_user.id != user.id %}
+                        {% if current_user.is_following(user) %}
+                            <form action="{{ url_for('follow_system.unfollow', username=user.username) }}" method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger">Unfollow</button>
+                            </form>
+                        {% else %}
+                            <form action="{{ url_for('follow_system.follow', username=user.username) }}" method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-primary">Follow</button>
+                            </form>
+                        {% endif %}
+                    {% elif current_user.is_authenticated and current_user.id == user.id %}
+                        <a href="{{ url_for('user_profiles.edit_profile') }}" class="btn btn-outline-primary">Edit Profile</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <h3>{{ user.username }}'s Tweets</h3>
+            {% for tweet in tweets %}
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <p class="card-text">{{ tweet.content }}</p>
+                        <small class="text-muted">{{ tweet.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

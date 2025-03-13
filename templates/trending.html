@@ -1,0 +1,112 @@
+<!-- trending.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trending - Twitter Clone</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body class="container">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('home') }}">Twitter Clone</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('home') }}">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('search_functionality.trending') }}">Trending</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <h1 class="mt-4">Trending Now</h1>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Trending Hashtags</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for hashtag, count in trending %}
+                            <a href="{{ url_for('search_functionality.hashtag', tag=hashtag.text) }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">#{{ hashtag.text }}</h5>
+                                    <span class="badge bg-primary rounded-pill">{{ count }} tweets in the last 24h</span>
+                                </div>
+                                
+                                {% set sample_tweet = hashtag.tweets.order_by(Tweet.timestamp.desc()).first() %}
+                                {% if sample_tweet %}
+                                    <p class="mb-1">
+                                        <small>
+                                            <a href="{{ url_for('user_profiles.profile', username=sample_tweet.user.username) }}">{{ sample_tweet.user.username }}</a>: 
+                                            {{ sample_tweet.content[:100] }}{% if sample_tweet.content|length > 100 %}...{% endif %}
+                                        </small>
+                                    </p>
+                                {% endif %}
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Most Active Users</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for user, count in active_users %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <a href="{{ url_for('user_profiles.profile', username=user.username) }}">
+                                    {{ user.username }}
+                                </a>
+                                <span class="badge bg-primary rounded-pill">{{ count }} tweets</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5>Most Liked Tweets</h5>
+                </div>
+                <div class="card-body">
+                    {% for tweet, like_count in popular_tweets %}
+                        <div class="card mb-2">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <h6 class="card-subtitle mb-2 text-muted">
+                                        <a href="{{ url_for('user_profiles.profile', username=tweet.user.username) }}">
+                                            {{ tweet.user.username }}
+                                        </a>
+                                    </h6>
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-heart-fill"></i> {{ like_count }}
+                                    </span>
+                                </div>
+                                <p class="card-text small">
+                                    <a href="{{ url_for('tweet_interactions.view_tweet', tweet_id=tweet.id) }}">
+                                        {{ tweet.content[:100] }}{% if tweet.content|length > 100 %}...{% endif %}
+                                    </a>
+                                </p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

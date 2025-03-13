@@ -1,0 +1,204 @@
+<!-- search.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Results</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body class="container">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('home') }}">Twitter Clone</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('home') }}">Home</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <h1 class="mt-4">Search Results for "{{ query }}"</h1>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <ul class="nav nav-tabs mb-4" id="searchTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tweets-tab" data-bs-toggle="tab" data-bs-target="#tweets" type="button" role="tab">
+                        Tweets <span class="badge bg-primary">{{ tweets|length }}</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="people-tab" data-bs-toggle="tab" data-bs-target="#people" type="button" role="tab">
+                        People <span class="badge bg-primary">{{ users|length }}</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="hashtags-tab" data-bs-toggle="tab" data-bs-target="#hashtags" type="button" role="tab">
+                        Hashtags <span class="badge bg-primary">{{ hashtags|length }}</span>
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="searchTabsContent">
+                <div class="tab-pane fade show active" id="tweets" role="tabpanel">
+                    {% if tweets %}
+                        {% for tweet in tweets %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <h5 class="card-title">
+                                            <a href="{{ url_for('user_profiles.profile', username=tweet.user.username) }}">
+                                                {{ tweet.user.username }}
+                                            </a>
+                                        </h5>
+                                        <small class="text-muted">{{ tweet.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                                    </div>
+                                    <p class="card-text">{{ tweet.content }}</p>
+                                    
+                                    <div class="d-flex mt-2">
+                                        <button class="btn btn-sm btn-outline-primary me-2 like-btn" data-tweet-id="{{ tweet.id }}">
+                                            <i class="bi bi-heart{% if current_user.is_authenticated and tweet.is_liked_by(current_user) %}-fill{% endif %}"></i>
+                                            <span class="like-count">{{ tweet.get_like_count() }}</span>
+                                        </button>
+                                        <a href="{{ url_for('tweet_interactions.view_tweet', tweet_id=tweet.id) }}" class="btn btn-sm btn-outline-secondary me-2">
+                                            <i class="bi bi-chat"></i>
+                                            <span class="reply-count">{{ tweet.get_reply_count() }}</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-info">No tweets found matching "{{ query }}".</div>
+                    {% endif %}
+                </div>
+                
+                <div class="tab-pane fade" id="people" role="tabpanel">
+                    {% if users %}
+                        <div class="list-group">
+                            {% for user in users %}
+                                <div class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div>
+                                            <h5 class="mb-1">
+                                                <a href="{{ url_for('user_profiles.profile', username=user.username) }}">
+                                                    {{ user.username }}
+                                                </a>
+                                            </h5>
+                                            {% if user.bio %}
+                                                <p class="mb-1">{{ user.bio }}</p>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if current_user.is_authenticated and current_user.id != user.id %}
+                                            {% if current_user.is_following(user) %}
+                                                <form action="{{ url_for('follow_system.unfollow', username=user.username) }}" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Unfollow</button>
+                                                </form>
+                                            {% else %}
+                                                <form action="{{ url_for('follow_system.follow', username=user.username) }}" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="submit" class="btn btn-sm btn-primary">Follow</button>
+                                                </form>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">No users found matching "{{ query }}".</div>
+                    {% endif %}
+                </div>
+                
+                <div class="tab-pane fade" id="hashtags" role="tabpanel">
+                    {% if hashtags %}
+                        <div class="list-group">
+                            {% for hashtag in hashtags %}
+                                <a href="{{ url_for('search_functionality.hashtag', tag=hashtag.text) }}" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h5 class="mb-1">#{{ hashtag.text }}</h5>
+                                        <span class="badge bg-primary rounded-pill">{{ hashtag.tweets.count() }} tweets</span>
+                                    </div>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">No hashtags found matching "{{ query }}".</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Search Tips</h5>
+                </div>
+                <div class="card-body">
+                    <ul>
+                        <li>Use <code>#hashtag</code> to search for hashtags</li>
+                        <li>Use <code>@username</code> to find specific users</li>
+                        <li>Add keywords for more specific results</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5>Trending Hashtags</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for hashtag, count in trending_hashtags[:5] %}
+                            <a href="{{ url_for('search_functionality.hashtag', tag=hashtag.text) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                #{{ hashtag.text }}
+                                <span class="badge bg-primary rounded-pill">{{ count }}</span>
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Like functionality
+        document.querySelectorAll('.like-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const tweetId = this.getAttribute('data-tweet-id');
+                fetch(`/tweet/${tweetId}/like`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': '{{ csrf_token() }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const icon = this.querySelector('i');
+                    const count = this.querySelector('.like-count');
+                    
+                    if (data.status === 'liked') {
+                        icon.classList.remove('bi-heart');
+                        icon.classList.add('bi-heart-fill');
+                    } else {
+                        icon.classList.remove('bi-heart-fill');
+                        icon.classList.add('bi-heart');
+                    }
+                    
+                    count.textContent = data.count;
+                });
+            });
+        });
+    </script>
+</body>
+</html>

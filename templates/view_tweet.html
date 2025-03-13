@@ -51,7 +51,7 @@
             <div class="card-body">
                 <h5 class="card-title">Reply to this tweet</h5>
                 <form action="{{ url_for('tweet_interactions.reply_to_tweet', tweet_id=tweet.id) }}" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                     <textarea name="content" class="form-control" rows="3" placeholder="Write your reply..." required></textarea>
                     <button type="submit" class="btn btn-primary mt-2">Reply</button>
                 </form>

@@ -99,12 +99,12 @@
                                         {% if current_user.is_authenticated and current_user.id != user.id %}
                                             {% if current_user.is_following(user) %}
                                                 <form action="{{ url_for('follow_system.unfollow', username=user.username) }}" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                                                     <button type="submit" class="btn btn-sm btn-outline-danger">Unfollow</button>
                                                 </form>
                                             {% else %}
                                                 <form action="{{ url_for('follow_system.follow', username=user.username) }}" method="POST">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                                                     <button type="submit" class="btn btn-sm btn-primary">Follow</button>
                                                 </form>
                                             {% endif %}

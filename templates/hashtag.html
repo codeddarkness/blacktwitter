@@ -89,7 +89,7 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <form action="{{ url_for('tweet_interactions.retweet', tweet_id=tweet.id) }}" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                                 <div class="modal-body">
                                     <p>Original tweet by {{ tweet.user.username }}:</p>
                                     <p class="card-text">{{ tweet.content }}</p>

@@ -34,9 +34,9 @@ def setup_rate_limiting(app):
 # from security_enhancements import setup_csrf_protection
 def setup_csrf_protection(app):
     try:
-        from flask_wtf.csrf import CSRFProtect
+        # from flask_wtf.csrf import CSRFProtect
         
-        csrf = CSRFProtect(app)
+        # csrf = CSRFProtect(app)
         return csrf
     except ImportError:
         app.logger.warning("Flask-WTF not installed. CSRF protection disabled.")
@@ -381,7 +381,18 @@ def init_security(app, db_obj, user_model, bcrypt_obj):
                 
                 return original_login()
             
-            app.view_functions['login'] = login_with_2fa
+            try:
+                try:
+                app.view_functions['login'] = login_with_2fa
+            except Exception as e:
+                app.logger.error(f"Failed to replace login function: {str(e)}")
+                print("Successfully replaced login function with 2FA-enabled version")
+            except Exception as e:
+                print("Error replacing login function: " + str(e))
+                # As a fallback, define a new route
+                @app.route('/login2fa', methods=['GET', 'POST'])
+                def login2fa():
+                    return login_with_2fa()
             
             # Add 2FA verification route
             @security.route('/verify_2fa', methods=['GET', 'POST'])

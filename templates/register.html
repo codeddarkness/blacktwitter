@@ -64,7 +64,7 @@
         <div class="card mb-4">
             <div class="card-body">
                 <form action="{{ url_for('post_tweet') }}" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                     <textarea name="content" class="form-control" rows="3" placeholder="What's happening?" required></textarea>
                     <div class="mt-2 d-flex justify-content-between">
                         <div>
@@ -156,7 +156,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <form action="{{ url_for('tweet_interactions.retweet', tweet_id=tweet.id) }}" method="POST">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                         <div class="modal-body">
                             <p>Original tweet by {{ tweet.user.username }}:</p>
                             <p class="card-text">{{ tweet.content }}</p>
@@ -254,7 +254,7 @@ Update your login.html template to include email field for password reset:
     {% endwith %}
     
     <form method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
         <input type="text" name="username" class="form-control" placeholder="Username" required>
         <input type="password" name="password" class="form-control mt-2" placeholder="Password" required>
         <button type="submit" class="btn btn-primary mt-2">Login</button>
@@ -286,7 +286,7 @@ Update your register.html template to include email field:
     {% endwith %}
     
     <form method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
         <input type="text" name="username" class="form-control" placeholder="Username" required>
         <input type="email" name="email" class="form-control mt-2" placeholder="Email (for password recovery)" required>
         <input type="password" name="password" class="form-control mt-2" placeholder="Password" required>

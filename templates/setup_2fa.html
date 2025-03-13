@@ -68,7 +68,7 @@
                     <p>Enter the verification code from your authenticator app to verify the setup.</p>
                     
                     <form method="POST">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                         <div class="mb-3">
                             <label for="token" class="form-label">Verification Code</label>
                             <input type="text" class="form-control" id="token" name="token" placeholder="Enter 6-digit code" required>
@@ -133,7 +133,7 @@
                     <p>Please enter the verification code from your authenticator app.</p>
                     
                     <form method="POST">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                         <div class="mb-3">
                             <label for="token" class="form-label">Verification Code</label>
                             <input type="text" class="form-control" id="token" name="token" placeholder="Enter 6-digit code" required autocomplete="off">

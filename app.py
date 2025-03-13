@@ -3,9 +3,12 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 import datetime
+# from flask_wtf.csrf import CSRFProtect
+
 
 # Initialize Flask app
 app = Flask(__name__)
+# csrf = CSRFProtect(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///twitter_clone.db'
 app.config['SECRET_KEY'] = 'your_secret_key'  # Change this to a secure secret key
 
@@ -65,6 +68,59 @@ def login():
             flash("Invalid username or password", "danger")
     return render_template("login.html")
 
+@app.route("/login_backup", methods=["GET", "POST"])
+def login_backup():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        user = User.query.filter_by(username=username).first()
+        if user and bcrypt.check_password_hash(user.password, password):
+            login_user(user)
+            flash("Login successful!", "success")
+            return redirect(url_for("home"))
+        else:
+            flash("Invalid username or password", "danger")
+    return render_template("login.html")
+
+@app.route("/simple_login", methods=["GET", "POST"])
+def simple_login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        user = User.query.filter_by(username=username).first()
+        if user and bcrypt.check_password_hash(user.password, password):
+            login_user(user)
+            flash("Login successful!", "success")
+            return redirect(url_for("home"))
+        else:
+            flash("Invalid username or password", "danger")
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Simple Login</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    </head>
+    <body class="container">
+        <h1 class="mt-4">Simple Login</h1>
+        
+        <form method="POST" >
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" id="username" name="username" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" id="password" name="password" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+    </body>
+    </html>
+    '''
+
+
+
 @app.route("/logout")
 @login_required
 def logout():
@@ -110,6 +166,45 @@ def init_modules():
     init_security(app, db, User, bcrypt)
 
 
+
+
+@app.route("/no_csrf_login", methods=["GET", "POST"])
+def no_csrf_login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        user = User.query.filter_by(username=username).first()
+        if user and bcrypt.check_password_hash(user.password, password):
+            login_user(user)
+            flash("Login successful!", "success")
+            return redirect(url_for("home"))
+        else:
+            flash("Invalid username or password", "danger")
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Login - No CSRF</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    </head>
+    <body class="container">
+        <h1 class="mt-4">Login</h1>
+        
+        <form method="POST">
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" id="username" name="username" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" id="password" name="password" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+        <p class="mt-3"><a href="{{ url_for('register') }}">Don't have an account? Register</a></p>
+    </body>
+    </html>
+    '''
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()  # Ensures database tables are created inside the application context

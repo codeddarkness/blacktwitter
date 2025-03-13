@@ -141,7 +141,7 @@
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <form action="{{ url_for('tweet_interactions.retweet', tweet_id=tweet.id) }}" method="POST">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                                     <div class="modal-body">
                                         <p>Original tweet by {{ tweet.user.username }}:</p>
                                         <p class="card-text">{{ tweet.content }}</p>
@@ -181,7 +181,7 @@
                                         {{ user.username }}
                                     </a>
                                     <form action="{{ url_for('follow_system.follow', username=user.username) }}" method="POST">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                                         <button type="submit" class="btn btn-sm btn-primary">Follow</button>
                                     </form>
                                 </div>
@@ -218,7 +218,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ url_for('post_tweet') }}" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                     <div class="modal-body">
                         <textarea name="content" class="form-control" rows="3" placeholder="What's happening?" required></textarea>
                         <div class="mt-2">
